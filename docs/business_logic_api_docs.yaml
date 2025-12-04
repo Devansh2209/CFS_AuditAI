@@ -1,0 +1,459 @@
+openapi: 3.0.0
+info:
+  title: Business Logic Service API
+  description: |
+    Enterprise-grade business logic and custom rules management for cash flow classification.
+    
+    This service combines AI predictions with industry-specific rules and custom client rules
+    to achieve 95%+ classification accuracy.
+  version: 1.0.0
+  contact:
+    name: CashflowAI Support
+    email: support@cashflowai.com
+
+servers:
+  - url: https://api.cashflowai.com/v1
+    description: Production
+  - url: https://staging-api.cashflowai.com/v1
+    description: Staging
+  - url: http://localhost:3000/v1
+    description: Local Development
+
+tags:
+  - name: Custom Rules
+    description: Create and manage custom classification rules
+  - name: Analytics
+    description: Rule execution analytics and performance metrics
+
+paths:
+  /rules/custom:
+    post:
+      tags:
+        - Custom Rules
+      summary: Create custom rule
+      description: Create a new custom classification rule for a client
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateRuleRequest'
+            examples:
+              aws_cloud_costs:
+                summary: AWS Cloud Costs Rule
+                value:
+                  client_id: 123
+                  rule_name: "AWS Cloud Costs are Operating"
+                  rule_description: "Classify all AWS and cloud infrastructure costs as operating expenses"
+                  conditions:
+                    description_contains: ["AWS", "cloud", "Azure"]
+                    amount_range:
+                      min: 0
+                      max: 100000
+                  action:
+                    category: "Operating"
+                    note: "Cloud infrastructure costs for SaaS business"
+                  priority: 150
+      responses:
+        '201':
+          description: Rule created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RuleResponse'
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Rule with this name already exists
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+    get:
+      tags:
+        - Custom Rules
+      summary: List custom rules
+      description: Get all custom rules for a client
+      parameters:
+        - name: client_id
+          in: query
+          required: true
+          schema:
+            type: integer
+          description: Client ID
+        - name: active
+          in: query
+          required: false
+          schema:
+            type: boolean
+          description: Filter by active status
+      responses:
+        '200':
+          description: List of rules
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  count:
+                    type: integer
+                  rules:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Rule'
+
+  /rules/custom/{id}:
+    get:
+      tags:
+        - Custom Rules
+      summary: Get custom rule
+      description: Get a single custom rule by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Rule details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RuleResponse'
+        '404':
+          description: Rule not found
+
+    put:
+      tags:
+        - Custom Rules
+      summary: Update custom rule
+      description: Update an existing custom rule
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateRuleRequest'
+      responses:
+        '200':
+          description: Rule updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RuleResponse'
+        '404':
+          description: Rule not found
+
+    delete:
+      tags:
+        - Custom Rules
+      summary: Delete custom rule
+      description: Delete a custom rule
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Rule deleted successfully
+        '404':
+          description: Rule not found
+
+  /rules/custom/test:
+    post:
+      tags:
+        - Custom Rules
+      summary: Test custom rule
+      description: Test a rule against sample transactions (dry-run)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - rule
+                - test_transactions
+              properties:
+                rule:
+                  type: object
+                  required:
+                    - conditions
+                    - action
+                  properties:
+                    conditions:
+                      $ref: '#/components/schemas/RuleConditions'
+                    action:
+                      $ref: '#/components/schemas/RuleAction'
+                test_transactions:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                      description:
+                        type: string
+                      amount:
+                        type: number
+                      vendor:
+                        type: string
+            example:
+              rule:
+                conditions:
+                  description_contains: ["AWS"]
+                action:
+                  category: "Operating"
+              test_transactions:
+                - id: "tx_1"
+                  description: "AWS cloud infrastructure"
+                  amount: 5000
+                - id: "tx_2"
+                  description: "Purchase of equipment"
+                  amount: 50000
+      responses:
+        '200':
+          description: Test results
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  test_results:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        transaction_id:
+                          type: string
+                        description:
+                          type: string
+                        matched:
+                          type: boolean
+                        would_classify_as:
+                          type: string
+                  summary:
+                    type: object
+                    properties:
+                      total_tested:
+                        type: integer
+                      matched:
+                        type: integer
+                      not_matched:
+                        type: integer
+                      match_rate:
+                        type: string
+
+  /analytics/executions:
+    get:
+      tags:
+        - Analytics
+      summary: Get rule execution analytics
+      description: Get analytics on rule executions for a client
+      parameters:
+        - name: client_id
+          in: query
+          required: true
+          schema:
+            type: integer
+        - name: start_date
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: end_date
+          in: query
+          schema:
+            type: string
+            format: date
+      responses:
+        '200':
+          description: Analytics data
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  analytics:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        rule_type:
+                          type: string
+                        rule_name:
+                          type: string
+                        execution_count:
+                          type: integer
+                        match_count:
+                          type: integer
+                        avg_execution_time_ms:
+                          type: number
+
+components:
+  schemas:
+    CreateRuleRequest:
+      type: object
+      required:
+        - client_id
+        - rule_name
+        - conditions
+        - action
+      properties:
+        client_id:
+          type: integer
+          description: Client ID
+        rule_name:
+          type: string
+          minLength: 1
+          maxLength: 255
+          description: Unique rule name
+        rule_description:
+          type: string
+          description: Optional description
+        conditions:
+          $ref: '#/components/schemas/RuleConditions'
+        action:
+          $ref: '#/components/schemas/RuleAction'
+        priority:
+          type: integer
+          minimum: 0
+          maximum: 1000
+          default: 100
+          description: Higher priority rules are evaluated first
+
+    UpdateRuleRequest:
+      type: object
+      properties:
+        rule_name:
+          type: string
+        rule_description:
+          type: string
+        conditions:
+          $ref: '#/components/schemas/RuleConditions'
+        action:
+          $ref: '#/components/schemas/RuleAction'
+        priority:
+          type: integer
+        active:
+          type: boolean
+
+    RuleConditions:
+      type: object
+      properties:
+        description_contains:
+          type: array
+          items:
+            type: string
+          description: Keywords that must appear in transaction description
+        amount_range:
+          type: object
+          properties:
+            min:
+              type: number
+            max:
+              type: number
+        vendor_matches:
+          type: array
+          items:
+            type: string
+        date_range:
+          type: object
+          properties:
+            start:
+              type: string
+              format: date
+            end:
+              type: string
+              format: date
+
+    RuleAction:
+      type: object
+      required:
+        - category
+      properties:
+        category:
+          type: string
+          enum: [Operating, Investing, Financing]
+        note:
+          type: string
+        flag_for_review:
+          type: boolean
+          default: false
+
+    Rule:
+      type: object
+      properties:
+        id:
+          type: integer
+        client_id:
+          type: integer
+        rule_name:
+          type: string
+        rule_description:
+          type: string
+        conditions:
+          $ref: '#/components/schemas/RuleConditions'
+        action:
+          $ref: '#/components/schemas/RuleAction'
+        priority:
+          type: integer
+        active:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    RuleResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        rule:
+          $ref: '#/components/schemas/Rule'
+        message:
+          type: string
+
+    Error:
+      type: object
+      properties:
+        success:
+          type: boolean
+        error:
+          type: string
+        errors:
+          type: array
+          items:
+            type: object
+
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+security:
+  - BearerAuth: []

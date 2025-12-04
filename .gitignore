@@ -1,0 +1,28 @@
+# Dependencies
+node_modules/
+venv/
+v30_env/
+__pycache__/
+.python-version
+
+# System
+.DS_Store
+.idea/
+.vscode/
+
+# Data & Models
+data/
+v30_data/
+trained_models/
+archive/
+
+# Logs
+logs/
+*.log
+
+# Environment variables
+.env
+
+# Build artifacts
+dist/
+build/

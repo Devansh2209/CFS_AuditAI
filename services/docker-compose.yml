@@ -1,0 +1,220 @@
+
+
+services:
+  # API Gateway
+  gateway:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+    volumes:
+      - ./gateway/nginx.conf:/etc/nginx/nginx.conf
+    depends_on:
+      - security-auth-service
+      - accounting-standards-service
+      - frontend
+
+  # Core Business Logic Services
+  accounting-standards-service:
+    build:
+      context: .
+      dockerfile: accounting-standards-service/Dockerfile
+    ports:
+      - "8001:8001"
+    environment:
+      - PORT=8001
+      - DB_HOST=accounting_standards_db
+    depends_on:
+      - accounting_standards_db
+
+  business-logic-service:
+    build:
+      context: .
+      dockerfile: business-logic-service/Dockerfile
+    ports:
+      - "8002:8002"
+    environment:
+      - PORT=8002
+      - DB_HOST=business_rules_db
+    depends_on:
+      - business_rules_db
+
+  # Data Processing Services
+  data-ingestion-service:
+    build:
+      context: .
+      dockerfile: data-ingestion-service/Dockerfile
+    ports:
+      - "8003:8003"
+    environment:
+      - PORT=8003
+      - DB_HOST=ingestion_queue_db
+    depends_on:
+      - ingestion_queue_db
+
+  fluctuation-analysis-service:
+    build:
+      context: .
+      dockerfile: fluctuation-analysis-service/Dockerfile
+    ports:
+      - "8004:8004"
+    environment:
+      - PORT=8004
+      - DB_HOST=analysis_results_db
+    depends_on:
+      - analysis_results_db
+
+  # AI/ML Services
+  classification-ai-service:
+    build:
+      context: .
+      dockerfile: classification-ai-service/Dockerfile
+    ports:
+      - "8005:8005"
+    environment:
+      - PORT=8005
+      - DB_HOST=ml_models_db
+    depends_on:
+      - ml_models_db
+
+  nlp-processing-service:
+    build:
+      context: .
+      dockerfile: nlp-processing-service/Dockerfile
+    ports:
+      - "8006:8006"
+    environment:
+      - PORT=8006
+      - DB_HOST=nlp_cache_db
+    depends_on:
+      - nlp_cache_db
+
+  # Workflow & Approval Services
+  reclassification-service:
+    build:
+      context: .
+      dockerfile: reclassification-service/Dockerfile
+    ports:
+      - "8007:8007"
+    environment:
+      - PORT=8007
+      - DB_HOST=reclassification_db
+    depends_on:
+      - reclassification_db
+
+  workflow-orchestration-service:
+    build:
+      context: .
+      dockerfile: workflow-orchestration-service/Dockerfile
+    ports:
+      - "8008:8008"
+    environment:
+      - PORT=8008
+      - DB_HOST=workflow_state_db
+    depends_on:
+      - workflow_state_db
+
+  # Security & Compliance Services
+  audit-compliance-service:
+    build:
+      context: .
+      dockerfile: audit-compliance-service/Dockerfile
+    ports:
+      - "8009:8009"
+    environment:
+      - PORT=8009
+      - DB_HOST=audit_trail_db
+    depends_on:
+      - audit_trail_db
+
+  security-auth-service:
+    build:
+      context: .
+      dockerfile: security-auth-service/Dockerfile
+    ports:
+      - "8010:8010"
+    environment:
+      - PORT=8010
+      - DB_HOST=security_db
+    depends_on:
+      - security_db
+
+  # Client & Configuration Services
+  client-configuration-service:
+    build:
+      context: .
+      dockerfile: client-configuration-service/Dockerfile
+    ports:
+      - "8011:8011"
+    environment:
+      - PORT=8011
+      - DB_HOST=client_config_db
+    depends_on:
+      - client_config_db
+
+  # Databases (Mocked for now with Postgres)
+  accounting_standards_db:
+    image: postgres:14-alpine
+    environment:
+      POSTGRES_PASSWORD: password
+  
+  business_rules_db:
+    image: postgres:14-alpine
+    environment:
+      POSTGRES_PASSWORD: password
+
+  ingestion_queue_db:
+    image: postgres:14-alpine
+    environment:
+      POSTGRES_PASSWORD: password
+
+  analysis_results_db:
+    image: postgres:14-alpine
+    environment:
+      POSTGRES_PASSWORD: password
+
+  ml_models_db:
+    image: postgres:14-alpine
+    environment:
+      POSTGRES_PASSWORD: password
+
+  nlp_cache_db:
+    image: postgres:14-alpine
+    environment:
+      POSTGRES_PASSWORD: password
+
+  reclassification_db:
+    image: postgres:14-alpine
+    environment:
+      POSTGRES_PASSWORD: password
+
+  workflow_state_db:
+    image: postgres:14-alpine
+    environment:
+      POSTGRES_PASSWORD: password
+
+  audit_trail_db:
+    image: postgres:14-alpine
+    environment:
+      POSTGRES_PASSWORD: password
+
+  security_db:
+    image: postgres:14-alpine
+    environment:
+      POSTGRES_PASSWORD: password
+
+  client_config_db:
+    image: postgres:14-alpine
+    environment:
+      POSTGRES_PASSWORD: password
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    environment:
+      - CHOKIDAR_USEPOLLING=true
