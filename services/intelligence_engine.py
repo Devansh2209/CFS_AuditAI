@@ -31,13 +31,22 @@ class IntelligenceEngine:
         self.finbert_classifier = None
         if HAS_TRANSFORMERS:
             try:
-                # Switching to a much lighter DistilBART model to prevent memory crashes
-                self.finbert_classifier = pipeline(
-                    "zero-shot-classification", 
-                    model="valhalla/distilbart-mnli-12-1", 
-                    device=-1 # stay on CPU to be safe
-                )
-                logger.info("FinBERT (DistilBART-Zero-Shot) loaded successfully.")
+                import config
+                local_finbert = os.path.join(config.BASE_DIR, "trained_models", "finbert_v31_transformer")
+                if os.path.exists(local_finbert):
+                    self.finbert_classifier = pipeline(
+                        "text-classification", 
+                        model=local_finbert, 
+                        device=-1 # CPU
+                    )
+                    logger.info("Loaded YOUR locally trained FinBERT Model successfully!")
+                else:
+                    self.finbert_classifier = pipeline(
+                        "zero-shot-classification", 
+                        model="valhalla/distilbart-mnli-12-1", 
+                        device=-1 
+                    )
+                    logger.info("Local FinBERT missing, loaded DistilBART fallback.")
             except Exception as e:
                 logger.warning(f"Could not load FinBERT: {e}. Falling back to Random Forest.")
 
@@ -205,9 +214,24 @@ class IntelligenceEngine:
             
             if self.finbert_classifier:
                 labels = ["Operating Activity", "Investing Activity", "Financing Activity"]
-                res = self.finbert_classifier(desc_context, candidate_labels=labels)
-                gaap_pred = res['labels'][0]
-                gaap_conf = res['scores'][0]
+                
+                # Check what type of pipeline we loaded based on output
+                try:
+                    import config
+                    local_finbert = os.path.join(config.BASE_DIR, "trained_models", "finbert_v31_transformer")
+                    if os.path.exists(local_finbert):
+                        # Text Classification output structure: list of dicts [{'label': 'Op...', 'score': 0.9}]
+                        res = self.finbert_classifier(desc_context)[0]
+                        gaap_pred = res['label']
+                        gaap_conf = res['score']
+                    else:
+                        # Zero-shot output structure: dict {'labels': [], 'scores': []}
+                        res = self.finbert_classifier(desc_context, candidate_labels=labels)
+                        gaap_pred = res['labels'][0]
+                        gaap_conf = res['scores'][0]
+                except Exception as e:
+                    logger.error(f"FinBERT prediction error: {e}")
+                    gaap_pred = "Operating Activity"
             else:
                 activities = {
                     'Revenue': 'Operating Activity',
