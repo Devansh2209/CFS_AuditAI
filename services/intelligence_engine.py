@@ -189,13 +189,20 @@ class IntelligenceEngine:
         # 1. Contextual Window Input
         transactions['context_description'] = self._get_contextual_descriptions(transactions)
         
-        if self.pipeline is not None:
+        is_sklearn_pipeline = hasattr(self.pipeline, 'predict') and hasattr(self.pipeline, 'predict_proba')
+        
+        if self.pipeline is not None and is_sklearn_pipeline:
             # Layer 1: High-Speed Random Forest with Text + Numeric features
-            transactions['predicted_category'] = self.pipeline.predict(transactions)
-            probs = self.pipeline.predict_proba(transactions)
-            transactions['confidence'] = np.max(probs, axis=1)
-        else:
-            # Fallback if no model loaded
+            try:
+                transactions['predicted_category'] = self.pipeline.predict(transactions)
+                probs = self.pipeline.predict_proba(transactions)
+                transactions['confidence'] = np.max(probs, axis=1)
+            except ValueError as e:
+                logger.warning(f"Pipeline predict failed (possibly a HuggingFace model loaded as sklearn): {e}. Using fallback.")
+                self.pipeline = None # Reset to prevent further errors
+        
+        if self.pipeline is None or not is_sklearn_pipeline:
+            # Fallback if no model loaded or if model format is completely mismatched
             transactions['predicted_category'] = 'Operating Expense'
             transactions['confidence'] = 0.5
             transactions.loc[transactions['amount'] > 0, 'predicted_category'] = 'Revenue'
