@@ -173,6 +173,10 @@ class IntelligenceEngine:
         """Classifies a batch of raw transactions using a dual-layer + rule + LLM approach."""
         transactions = transactions.copy()
         
+        # Ensure clean alignment so list-assignment (like context_description) 
+        # doesn't throw "Length of values does not match length of index".
+        transactions = transactions.dropna(subset=['amount', 'description']).reset_index(drop=True)
+        
         # 1. Contextual Window Input
         transactions['context_description'] = self._get_contextual_descriptions(transactions)
         
